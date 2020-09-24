@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
 from sklearn.preprocessing import LabelEncoder
 
 train_data = pd.read_csv('train.csv')
@@ -25,19 +26,27 @@ train_data.loc[(train_data['family_size'] >= 4) & (train_data['family_size'] < 7
 train_data.loc[train_data['family_size'] >= 7, 'family_cut'] = 3
 family_cut = np.array(train_data.family_cut).reshape(-1, 1)
 
-# age class
-label = LabelEncoder()
-train_data.Age[np.isnan(train_data.Age)] = 25
-train_data['age_class'] = pd.qcut(train_data.Age, 5)
-train_data['age_class_code'] = label.fit_transform(train_data.age_class)
-age_class = np.array(train_data.age_class_code).reshape(-1, 1)
+# find age with nan and replace with median of name
+train_data['name'] = train_data['Name'].str.extract("([A-Za-z]+)\.", expand=False)
+train_data['name'] = train_data['name'].replace(['Mlle', 'Ms', 'Mme'], 'Miss')
+train_data['name'] = train_data['name'].replace(['Lady'], 'Mrs')
+train_data['name'] = train_data['name'].replace(['Dr', 'Capt', 'Col', 'Countess', 'Don', 'Dona', 'Jonkheer', 'Major', 'Rev', 'Sir'], 'Rare')
+train_data['name'] = train_data['name'].map({'Miss':0, 'Mrs':1, 'Master':2, 'Mr':3, 'Rare':4})
+age_median = train_data.groupby('name')['Age'].median()
+
+train_data['age_p'] = train_data['Age']
+for i in range(0,5):
+    train_data.loc[( (train_data.age_p.isnull()) & (train_data.name == i) ), 'age_p'] = age_median[i]
+train_data['age_class'] = ((train_data['age_p'] <= 30) & (train_data['age_p'] > 24))*1
+
+age_class = np.array(train_data['age_class']).reshape(-1, 1)
 
 feature = np.concatenate((sex, pclass, family_cut, age_class), axis=1)
 
 survived = np.array(train_data.Survived).reshape(-1,1)
 
 # initialize the model
-model = DecisionTreeClassifier()
+model = DecisionTreeClassifier(max_depth=4)
 model = model.fit(feature, survived)
 
 # get test file
@@ -56,10 +65,20 @@ test_data.loc[(test_data['family_size'] >= 4) & (test_data['family_size'] < 7), 
 test_data.loc[test_data['family_size'] >= 7, 'family_cut'] = 3
 family_cut = np.array(test_data.family_cut).reshape(-1, 1)
 
-test_data.Age[np.isnan(test_data.Age)] = 25
-test_data['age_class'] = pd.qcut(test_data.Age, 5)
-test_data['age_class_code'] = label.fit_transform(test_data.age_class)
-age_class = np.array(test_data.age_class_code).reshape(-1, 1)
+# find age with nan and replace with median of name
+test_data['name'] = test_data['Name'].str.extract("([A-Za-z]+)\.", expand=False)
+test_data['name'] = test_data['name'].replace(['Mlle', 'Ms', 'Mme'], 'Miss')
+test_data['name'] = test_data['name'].replace(['Lady'], 'Mrs')
+test_data['name'] = test_data['name'].replace(['Dr', 'Capt', 'Col', 'Countess', 'Don', 'Dona', 'Jonkheer', 'Major', 'Rev', 'Sir'], 'Rare')
+test_data['name'] = test_data['name'].map({'Miss':0, 'Mrs':1, 'Master':2, 'Mr':3, 'Rare':4})
+age_median = test_data.groupby('name')['Age'].median()
+
+test_data['age_p'] = test_data['Age']
+for i in range(0,5):
+    test_data.loc[( (test_data.age_p.isnull()) & (test_data.name == i) ), 'age_p'] = age_median[i]
+test_data['age_class'] = ( (test_data['age_p'] <= 30) & (test_data['age_p'] > 24) ) * 1
+
+age_class = np.array(test_data['age_class']).reshape(-1, 1)
 
 feature = np.concatenate((sex, pclass, family_cut, age_class), axis=1)
 print(feature.shape)
