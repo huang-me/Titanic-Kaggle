@@ -23,10 +23,9 @@ pclass = np.array(train_data.pclass).reshape(-1, 1)
 
 # family class
 train_data['family_size'] = train_data.SibSp + train_data.Parch
-train_data.loc[train_data['family_size'] == 0, 'family_cut'] = 0
-train_data.loc[(train_data['family_size'] >= 1) & (train_data['family_size'] < 5), 'family_cut'] = 1
-train_data.loc[(train_data['family_size'] >= 4) & (train_data['family_size'] < 7), 'family_cut'] = 2
-train_data.loc[train_data['family_size'] >= 7, 'family_cut'] = 3
+train_data.loc[(train_data['family_size'] == 0), 'family_cut'] = 0
+train_data.loc[(train_data['family_size'] >= 1) & (train_data['family_size'] < 4), 'family_cut'] = 1
+train_data.loc[(train_data['family_size'] >= 4), 'family_cut'] = 2
 family_cut = np.array(train_data.family_cut).reshape(-1, 1)
 
 # find age with nan and replace with median of name
@@ -40,7 +39,7 @@ age_median = train_data.groupby('name')['Age'].median()
 train_data['age_p'] = train_data['Age']
 for i in range(0,5):
     train_data.loc[( (train_data.age_p.isnull()) & (train_data.name == i) ), 'age_p'] = age_median[i]
-train_data['age_class'] = (train_data['age_p'] <= 15 )*1
+train_data['age_class'] = ((train_data['age_p'] <= 30 ) & (train_data['Age'] > 26) )*1
 
 age_class = np.array(train_data['age_class']).reshape(-1, 1)
 
@@ -57,7 +56,7 @@ feature_train = feature[:len(train)]
 survived = np.array(train_data[:len(train)].Survived).reshape(-1,1)
 
 # initialize the model
-model = RandomForestClassifier(oob_score=True)
+model = RandomForestClassifier(random_state=0, oob_score=True)
 model = model.fit(feature_train, survived.ravel())
 
 feature_test = feature[len(train):]
@@ -68,4 +67,4 @@ predict = model.predict(feature_test).astype(int)
 output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived':predict})
 output.to_csv('submission.csv', index=False)
 print('submission save successfully')
-print("%.4f" %(model.oob_score_))
+print("%.5f" %(model.oob_score_))
